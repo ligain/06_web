@@ -1,0 +1,29 @@
+{
+  "IPINFO_TOKEN": "1ee10a38aa0f51",
+  "OPENWEATHERMAP_TOKEN": "9058f29cd32bbf66513fc123ea4be1a4",
+  "LOGGER_CONF": {
+    "version": 1,
+    "formatters": {
+      "default": {
+        "format": "[%(asctime)s] %(levelname).1s %(message)s",
+        "datefmt": "%Y.%m.%d %H:%M:%S"
+      }
+    },
+    "handlers": {
+      "file": {
+        "level": "INFO",
+        "formatter": "default",
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": "/var/log/ip2w.log"
+      }
+    },
+    "loggers": {
+      "default": {
+        "level": "INFO",
+        "handlers": [
+          "file"
+        ]
+      }
+    }
+  }
+}
