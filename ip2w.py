@@ -4,23 +4,15 @@ import logging
 import re
 import os
 import json
-import urllib
 from functools import wraps
 from urllib.request import urlopen, Request
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 
-# import sys
-# sys.path.append('/opt/pycharm-2017.3.4/debug-eggs/pycharm-debug-py3k.egg')
-# import pydevd
-# pydevd.settrace('localhost', port=9091, stdoutToServer=True, stderrToServer=True)
-
-
-# CONFIG_PATH = '/usr/local/etc/ip2w_config.json'
-from logging.config import dictConfig
-
 CONFIG_PATH = '/home/linder/PycharmProjects/otus-python/06_web/homework/ip2w_config.json'
+HOST = 'localhost'
+PORT = 8080
 
 
 def get_geo_cords(env, ip):
@@ -175,5 +167,5 @@ def application(env, start_response):
 
 if __name__ == '__main__':
     from wsgiref.simple_server import make_server
-    srv = make_server('localhost', 8080, application)
+    srv = make_server(HOST, PORT, application)
     srv.serve_forever()
