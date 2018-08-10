@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 
-CONFIG_PATH = './ip2w_config.json'
+CONFIG_PATH = '/usr/local/etc/ip2w/ip2w_config.json'
 HOST = 'localhost'
 PORT = 8080
 

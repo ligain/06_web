@@ -4,5 +4,6 @@ Description=A daemon which gets weather for specified IP
 [Service]
 ExecStart=/usr/bin/bash -c 'uwsgi --ini /usr/local/etc/ip2w/uwsgi.ini'
 Restart=always
-StandardOutput=/var/log/ip2w/access.log
-StandardError=/var/log/ip2w/error.log
+
+[Install]
+WantedBy=multi-user.target
