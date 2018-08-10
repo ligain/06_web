@@ -14,7 +14,7 @@
         "level": "INFO",
         "formatter": "default",
         "class": "logging.handlers.RotatingFileHandler",
-        "filename": "/var/log/ip2w.log"
+        "filename": "/var/log/ip2w/ip2w.log"
       }
     },
     "loggers": {
