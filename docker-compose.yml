@@ -22,13 +22,3 @@ services:
     privileged: true
     tmpfs:
       - /run
-
-#  build_rpm:
-#    build:
-#      context: .
-#      dockerfile: ./build-rpm.dockerfile
-#    volumes:
-#     - rpm_package:/root/rpm/RPMS
-#
-#volumes:
-#  rpm_package: {}
