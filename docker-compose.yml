@@ -2,35 +2,33 @@ version: '2'
 
 
 services:
-#  nginx:
-#    image: nginx:1.14
-#    volumes:
-#     - ./nginx.conf:/etc/nginx/conf.d/default.conf
-#    ports:
-#     - "8000:80"
-#    command: /bin/bash -c "nginx -g 'daemon off;'"
-#    links:
-#     - uwsgi_daemon
+  nginx:
+    image: nginx:1.14
+    volumes:
+     - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+     - 80:80
+    command: /bin/bash -c "nginx -g 'daemon off;'"
+    links:
+     - uwsgi_daemon
 
   uwsgi_daemon:
     build:
       context: .
       dockerfile: ./build-daemon.dockerfile
-    depends_on:
-      - build_rpm
     volumes:
-     - rpm_package:/home/ip2w
+     - .:/home/ip2w
      - /sys/fs/cgroup:/sys/fs/cgroup:ro
-    ports:
-      - 8080:8080
     privileged: true
+    tmpfs:
+      - /run
 
-  build_rpm:
-    build:
-      context: .
-      dockerfile: ./build-rpm.dockerfile
-    volumes:
-     - rpm_package:/root/rpm/RPMS
-
-volumes:
-  rpm_package: {}
+#  build_rpm:
+#    build:
+#      context: .
+#      dockerfile: ./build-rpm.dockerfile
+#    volumes:
+#     - rpm_package:/root/rpm/RPMS
+#
+#volumes:
+#  rpm_package: {}

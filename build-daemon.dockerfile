@@ -1,6 +1,6 @@
 FROM centos/systemd
 
-EXPOSE 8080
+ADD . /home/ip2w/
 
 RUN yum install -y https://centos7.iuscommunity.org/ius-release.rpm \
     && yum update -y \
@@ -9,4 +9,9 @@ RUN yum install -y https://centos7.iuscommunity.org/ius-release.rpm \
     && pip3.6 install uWSGI==2.0.17.1 \
     && yum clean all
 
-CMD ["/usr/sbin/init"]
+EXPOSE 8080
+STOPSIGNAL SIGRTMIN+3
+
+RUN yum install -y /home/ip2w/*.rpm; systemctl enable ip2w
+
+CMD [ "/sbin/init" ]

@@ -8,10 +8,8 @@ Name:           ip2w
 Version:        0.0.1
 Release:        1
 BuildArch:      noarch
-Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
-BuildRequires: systemd
 Summary:  A daemon which gets weather by IP
 
 
@@ -37,10 +35,6 @@ Git version: %{git_version} (branch: %{git_branch})
 %{__install} -m 755 %{__appsource}/%{name}_config.json %{buildroot}/%{__etcdir}/%{name}
 %{__install} -m 755 %{__appsource}/uwsgi.ini %{buildroot}/%{__etcdir}/%{name}
 touch %{buildroot}%{__logdir}/%{name}/%{name}.log
-
-%post
-%systemd_post %{name}.service
-systemctl daemon-reload
 
 %preun
 %systemd_preun %{name}.service
