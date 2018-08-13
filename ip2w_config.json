@@ -1,6 +1,6 @@
 {
-  "IPINFO_TOKEN": "1ee10a38aa0f51",
-  "OPENWEATHERMAP_TOKEN": "9058f29cd32bbf66513fc123ea4be1a4",
+  "IPINFO_TOKEN": "",
+  "OPENWEATHERMAP_TOKEN": "",
   "LOGGER_CONF": {
     "version": 1,
     "formatters": {
@@ -25,5 +25,7 @@
         ]
       }
     }
-  }
+  },
+  "REQUEST_TIMEOUT": 15,
+  "REQUEST_MAX_RETRY": 5
 }

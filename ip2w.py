@@ -4,13 +4,14 @@ import logging
 import re
 import os
 import json
+import socket
+from logging.config import dictConfig
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 
-# CONFIG_PATH = '/usr/local/etc/ip2w/ip2w_config.json'
-CONFIG_PATH = './ip2w_config.json'
+CONFIG_PATH = '/usr/local/etc/ip2w/ip2w_config.json'
 HOST = 'localhost'
 PORT = 8080
 URL_REGEX = r'ip2w/((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.)' \
@@ -31,15 +32,23 @@ def get_geo_cords(ip, config):
         logging.error("IPINFO_TOKEN was not found in config")
         return None, None
     url = "https://ipinfo.io/{}/geo?token={}".format(ip, token)
+    timeout = config.get("REQUEST_TIMEOUT", 10)
+    retries = config.get("REQUEST_MAX_RETRY", 1)
     req = Request(url=url)
-    try:
-        with urlopen(req) as resp:
-            resp_dict = json.load(resp)
-            geo_cords = resp_dict.get('loc')
-            return geo_cords.split(',')
-    except HTTPError as e:
-        logging.error("Url: {} returned error: {}".format(url, str(e)))
-        return None, None
+    while retries:
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                resp_dict = json.load(resp)
+                geo_cords = resp_dict.get('loc')
+                return geo_cords.split(',')
+        except HTTPError as e:
+            logging.error("Url: {} returned error: {}".format(url, str(e)))
+            retries -= 1
+        except socket.timeout as e:
+            logging.error("Url: {} returned socket timeout error: {}".format(url, str(e)))
+            retries -= 1
+    logging.error("Max retry count reached for url: {}".format(url))
+    return None, None
 
 
 def get_weather(latitude, longitude, config):
@@ -62,16 +71,24 @@ def get_weather(latitude, longitude, config):
         'units': 'metric'
     })
     url = "https://api.openweathermap.org/data/2.5/weather?{}".format(request_params)
+    timeout = config.get("REQUEST_TIMEOUT", 10)
+    retries = config.get("REQUEST_MAX_RETRY", 1)
     req = Request(url=url)
-    try:
-        with urlopen(req) as resp:
-            resp_dict = json.load(resp)
-            return resp_dict
-    except HTTPError as e:
-        logging.error("Url: {} returned error: {}".format(url, str(e)))
+    while retries:
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                resp_dict = json.load(resp)
+                return resp_dict
+        except HTTPError as e:
+            logging.error("Url: {} returned error: {}".format(url, str(e)))
+            retries -= 1
+        except socket.timeout as e:
+            logging.error("Url: {} returned socket timeout error: {}".format(url, str(e)))
+            retries -= 1
+    logging.error("Max retry count reached for url: {}".format(url))
 
 
-def weather_handler(ip, config=None):
+def weather_handler(ip, config):
     if not ip:
         logging.error("IP address is missing")
         return
@@ -99,6 +116,7 @@ def send_response(code, status, start_response, headers, content=b''):
 
 
 def application(env, start_response):
+    socket.setdefaulttimeout(True)
 
     if not os.path.isfile(CONFIG_PATH):
         raise RuntimeError("Config was not found on "
@@ -106,13 +124,12 @@ def application(env, start_response):
 
     with open(CONFIG_PATH) as conf_file:
         config = json.load(conf_file)
-    # TODO perrmission denied
-    # dictConfig(config['LOGGER_CONF'])
+    dictConfig(config['LOGGER_CONF'])
 
     path = env.get('PATH_INFO', '').lstrip('/')
     match = re.search(URL_REGEX, path)
     if match is not None:
-        ip = match.groups(1)
+        ip = match.groups(1)[0]
         resp_content = weather_handler(ip, config)
         if resp_content is None:
             return send_response(
