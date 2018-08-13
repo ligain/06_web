@@ -4,30 +4,29 @@ import logging
 import re
 import os
 import json
-from functools import wraps
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 
-CONFIG_PATH = '/usr/local/etc/ip2w/ip2w_config.json'
+# CONFIG_PATH = '/usr/local/etc/ip2w/ip2w_config.json'
+CONFIG_PATH = './ip2w_config.json'
 HOST = 'localhost'
 PORT = 8080
+URL_REGEX = r'ip2w/((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.)' \
+        r'{3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/?$'
 
 
-def get_geo_cords(env, ip):
+def get_geo_cords(ip, config):
     """
     Retrieve latitude and longitude of server which
     has specific IP.
     If an error occurs the result will look like: (None, None)
     :param ip: str
+    :param config: dict
     :return: (latitude: str, longitude: str): tuple
     """
-    cfg = env.get('ip2w.config')
-    if not cfg:
-        logging.error("Config was not found")
-        return None, None
-    token = cfg.get('IPINFO_TOKEN')
+    token = config.get('IPINFO_TOKEN')
     if not token:
         logging.error("IPINFO_TOKEN was not found in config")
         return None, None
@@ -43,19 +42,15 @@ def get_geo_cords(env, ip):
         return None, None
 
 
-def get_weather(env, latitude, longitude):
+def get_weather(latitude, longitude, config):
     """
     Retrieve weather info from openweathermap API
-    :param env: dict
     :param latitude: str
     :param longitude: str
+    :param config: dict
     :return: dict or None
     """
-    cfg = env.get('ip2w.config')
-    if not cfg:
-        logging.error("Config was not found")
-        return
-    token = cfg.get('OPENWEATHERMAP_TOKEN')
+    token = config.get('OPENWEATHERMAP_TOKEN')
     if not token:
         logging.error("OPENWEATHERMAP_TOKEN was not found in config")
         return
@@ -76,43 +71,24 @@ def get_weather(env, latitude, longitude):
         logging.error("Url: {} returned error: {}".format(url, str(e)))
 
 
-def weather_handler(env, start_response):
-    ip_param = env.get('ip2w.url_args')
-    if not ip_param:
-        return send_response(
-            400, 'Bad Request',
-            start_response,
-            headers={"Content-Type": 'text/plain'},
-            content=b'Bad Request'
-        )
-    ip = ip_param[0]
-    latitude, longitude = get_geo_cords(env, ip)
+def weather_handler(ip, config=None):
+    if not ip:
+        logging.error("IP address is missing")
+        return
+    if not config:
+        logging.error("Config was not found")
+        return
+    latitude, longitude = get_geo_cords(ip, config)
     if not latitude or not longitude:
         logging.error("Wrong latitude or longitude received from ipinfo.io service")
-        return send_response(
-            500, 'Internal Server Error',
-            start_response,
-            headers={"Content-Type": 'text/plain'},
-        )
-    weather_dict = get_weather(env, latitude, longitude)
+        return
+    weather_dict = get_weather(latitude, longitude, config)
     result_dict = {
         'city': weather_dict.get('name'),
         'temp': weather_dict.get('main', {}).get('temp', ''),
         'conditions': weather_dict.get('weather', {})[0].get('description', '')
     }
-    resp_content = json.dumps(result_dict).encode()
-    return send_response(
-        200, 'OK',
-        start_response,
-        headers={"Content-Type": 'application/json; charset=utf-8'},
-        content=resp_content
-    )
-
-
-URLS = [
-    (r'ip2w/((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
-     r'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/?$', weather_handler)
-]
+    return json.dumps(result_dict).encode()
 
 
 def send_response(code, status, start_response, headers, content=b''):
@@ -122,47 +98,40 @@ def send_response(code, status, start_response, headers, content=b''):
     return [content]
 
 
-def config_middleware(config_path=None):
-    def wrap(app):
-        @wraps(app)
-        def wrapper(env, start_response):
-            if not os.path.isfile(config_path):
-                raise RuntimeError("Config was not found on "
-                                   "path: {}".format(config_path))
-            with open(config_path) as conf_file:
-                config_dict = json.load(conf_file)
-            # TODO perrmission denied
-            # dictConfig(config_dict['LOGGER_CONF'])
-            env['ip2w.config'] = config_dict
-            return app(env, start_response)
-        return wrapper
-    return wrap
+def application(env, start_response):
 
+    if not os.path.isfile(CONFIG_PATH):
+        raise RuntimeError("Config was not found on "
+                           "path: {}".format(CONFIG_PATH))
 
-def router_middleware(urlpatterns=None):
-    def wrap(app):
-        @wraps(app)
-        def wrapper(env, start_response):
-            path = env.get('PATH_INFO', '').lstrip('/')
-            for regex, handler in urlpatterns:
-                match = re.search(regex, path)
-                if match is not None:
-                    env['ip2w.url_args'] = match.groups()
-                    return handler(env, start_response)
+    with open(CONFIG_PATH) as conf_file:
+        config = json.load(conf_file)
+    # TODO perrmission denied
+    # dictConfig(config['LOGGER_CONF'])
+
+    path = env.get('PATH_INFO', '').lstrip('/')
+    match = re.search(URL_REGEX, path)
+    if match is not None:
+        ip = match.groups(1)
+        resp_content = weather_handler(ip, config)
+        if resp_content is None:
             return send_response(
-                404, 'Not Found',
+                500, 'Internal Server Error',
                 start_response,
                 headers={"Content-Type": 'text/plain'},
-                content=b'Not Found'
             )
-        return wrapper
-    return wrap
-
-
-@config_middleware(config_path=CONFIG_PATH)
-@router_middleware(urlpatterns=URLS)
-def application(env, start_response):
-    pass
+        return send_response(
+            200, 'OK',
+            start_response,
+            headers={"Content-Type": 'application/json; charset=utf-8'},
+            content=resp_content
+        )
+    return send_response(
+        404, 'Not Found',
+        start_response,
+        headers={"Content-Type": 'text/plain'},
+        content=b'Not Found'
+    )
 
 
 if __name__ == '__main__':

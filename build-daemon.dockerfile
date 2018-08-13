@@ -10,7 +10,6 @@ RUN yum install -y https://centos7.iuscommunity.org/ius-release.rpm \
     && yum clean all
 
 EXPOSE 8080
-STOPSIGNAL SIGRTMIN+3
 
 RUN yum install -y /home/ip2w/*.rpm; systemctl enable ip2w
 
