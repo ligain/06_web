@@ -18,6 +18,21 @@ URL_REGEX = r'ip2w/((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.)' \
         r'{3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))/?$'
 
 
+def get_url(url, timeout=10, retries=5):
+    req = Request(url=url)
+    while retries:
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                return json.load(resp)
+        except HTTPError as e:
+            logging.error("Url: {} returned error: {}".format(url, str(e)))
+            retries -= 1
+        except socket.timeout as e:
+            logging.error("Url: {} returned socket timeout error: {}".format(url, str(e)))
+            retries -= 1
+    logging.error("Max retry count reached for url: {}".format(url))
+
+
 def get_geo_cords(ip, config):
     """
     Retrieve latitude and longitude of server which
@@ -33,22 +48,10 @@ def get_geo_cords(ip, config):
         return None, None
     url = "https://ipinfo.io/{}/geo?token={}".format(ip, token)
     timeout = config.get("REQUEST_TIMEOUT", 10)
-    retries = config.get("REQUEST_MAX_RETRY", 1)
-    req = Request(url=url)
-    while retries:
-        try:
-            with urlopen(req, timeout=timeout) as resp:
-                resp_dict = json.load(resp)
-                geo_cords = resp_dict.get('loc')
-                return geo_cords.split(',')
-        except HTTPError as e:
-            logging.error("Url: {} returned error: {}".format(url, str(e)))
-            retries -= 1
-        except socket.timeout as e:
-            logging.error("Url: {} returned socket timeout error: {}".format(url, str(e)))
-            retries -= 1
-    logging.error("Max retry count reached for url: {}".format(url))
-    return None, None
+    retries = config.get("REQUEST_MAX_RETRY", 5)
+    resp_dict = get_url(url, timeout, retries)
+    geo_cords = resp_dict.get('loc')
+    return geo_cords.split(',')
 
 
 def get_weather(latitude, longitude, config):
@@ -72,20 +75,8 @@ def get_weather(latitude, longitude, config):
     })
     url = "https://api.openweathermap.org/data/2.5/weather?{}".format(request_params)
     timeout = config.get("REQUEST_TIMEOUT", 10)
-    retries = config.get("REQUEST_MAX_RETRY", 1)
-    req = Request(url=url)
-    while retries:
-        try:
-            with urlopen(req, timeout=timeout) as resp:
-                resp_dict = json.load(resp)
-                return resp_dict
-        except HTTPError as e:
-            logging.error("Url: {} returned error: {}".format(url, str(e)))
-            retries -= 1
-        except socket.timeout as e:
-            logging.error("Url: {} returned socket timeout error: {}".format(url, str(e)))
-            retries -= 1
-    logging.error("Max retry count reached for url: {}".format(url))
+    retries = config.get("REQUEST_MAX_RETRY", 5)
+    return get_url(url, timeout, retries)
 
 
 def weather_handler(ip, config):
@@ -95,7 +86,11 @@ def weather_handler(ip, config):
     if not config:
         logging.error("Config was not found")
         return
-    latitude, longitude = get_geo_cords(ip, config)
+    geo_cords = get_geo_cords(ip, config)
+    if geo_cords is None:
+        logging.error("There are no geo cords")
+        return
+    latitude, longitude = geo_cords
     if not latitude or not longitude:
         logging.error("Wrong latitude or longitude received from ipinfo.io service")
         return
